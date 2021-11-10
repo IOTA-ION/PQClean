@@ -8,6 +8,7 @@
 #include <unistd.h>
 #endif
 
+#define randombytes PQCRYPTO_RUST_randombytes
 int randombytes(uint8_t *buf, size_t n);
 
 #endif
