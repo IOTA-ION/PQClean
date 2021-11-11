@@ -4,9 +4,39 @@
 #include "fips202.h"
 #include "randombytes.h"
 #include "verify.h"
+#include <string.h>
 #include <stddef.h>
 #include <stdint.h>
 
+enum {
+    seedLen = 48,
+    seedBranchLen = 49
+};
+
+int PQCLEAN_FIRESABER_CLEAN_crypto_kem_keypair_seed(unsigned char *seed, unsigned char *pk, unsigned char *sk) {
+    size_t i;
+    uint8_t seedBranchBuf[seedBranchLen];
+    uint8_t tmpSeed[SABER_SEEDBYTES];
+    uint8_t noiseSeed[SABER_NOISESEEDBYTES];
+    // Last integer is for branching
+    memcpy(seedBranchBuf, seed, seedLen);
+    seedBranchBuf[32] = 0;
+    shake128(tmpSeed, SABER_SEEDBYTES, seedBranchBuf, seedBranchLen);
+    seedBranchBuf[32] = 1;
+    shake128(noiseSeed, SABER_NOISESEEDBYTES, seedBranchBuf, seedBranchLen);
+    PQCLEAN_FIRESABER_CLEAN_indcpa_kem_keypair_seed(tmpSeed, noiseSeed, pk, sk); // sk[0:SABER_INDCPA_SECRETKEYBYTES-1] <-- sk
+    for (i = 0; i < SABER_INDCPA_PUBLICKEYBYTES; i++) {
+        sk[i + SABER_INDCPA_SECRETKEYBYTES] = pk[i];    // sk[SABER_INDCPA_SECRETKEYBYTES:SABER_INDCPA_SECRETKEYBYTES+SABER_INDCPA_SECRETKEYBYTES-1] <-- pk
+    }
+
+    sha3_256(sk + SABER_SECRETKEYBYTES - 64, pk, SABER_INDCPA_PUBLICKEYBYTES); // Then hash(pk) is appended.
+
+    seedBranchBuf[32] = 2;
+    // Remaining part of sk contains a pseudo-random number (using shake128 to not reveal the remainingPartSeed).
+    shake128(sk + SABER_SECRETKEYBYTES - SABER_KEYBYTES, SABER_KEYBYTES, seedBranchBuf, seedBranchLen);
+    // This is output when check in PQCLEAN_FIRESABER_CLEAN_crypto_kem_dec() fails.
+    return (0);
+}
 
 int PQCLEAN_FIRESABER_CLEAN_crypto_kem_keypair(uint8_t *pk, uint8_t *sk) {
     size_t i;

@@ -10,6 +10,38 @@
 #define h1 (1 << (SABER_EQ - SABER_EP - 1))
 #define h2 ((1 << (SABER_EP - 2)) - (1 << (SABER_EP - SABER_ET - 1)) + (1 << (SABER_EQ - SABER_EP - 1)))
 
+void PQCLEAN_FIRESABER_CLEAN_indcpa_kem_keypair_seed(uint8_t *seed, uint8_t *noiseSeed, uint8_t pk[SABER_INDCPA_PUBLICKEYBYTES], uint8_t sk[SABER_INDCPA_SECRETKEYBYTES]) {
+    size_t i, j;
+
+    poly A[SABER_L][SABER_L];
+    poly s[SABER_L];
+    poly res[SABER_L];
+
+    uint8_t rand[SABER_NOISESEEDBYTES];
+    uint8_t *seed_A = pk + SABER_POLYVECCOMPRESSEDBYTES;
+
+    memcpy(seed_A, seed, SABER_SEEDBYTES);
+    memcpy(rand, noiseSeed, SABER_NOISESEEDBYTES);
+    
+    PQCLEAN_FIRESABER_CLEAN_GenSecret(s, rand);
+    PQCLEAN_FIRESABER_CLEAN_POLVECq2BS(sk, s);
+
+    PQCLEAN_FIRESABER_CLEAN_GenMatrix(A, seed_A); // sample matrix A
+    PQCLEAN_FIRESABER_CLEAN_MatrixVectorMul(res, (const poly (*)[SABER_L])A, (const poly *)s, 1); // Matrix in transposed order
+
+
+    // rounding
+    for (i = 0; i < SABER_L; i++) {
+        for (j = 0; j < SABER_N; j++) {
+            res[i].coeffs[j] += h1;
+            res[i].coeffs[j] >>= SABER_EQ - SABER_EP;
+            res[i].coeffs[j] &= SABER_Q - 1;
+        }
+    }
+
+    PQCLEAN_FIRESABER_CLEAN_POLVECp2BS(pk, res); // pack public key
+}
+
 void PQCLEAN_FIRESABER_CLEAN_indcpa_kem_keypair(uint8_t pk[SABER_INDCPA_PUBLICKEYBYTES], uint8_t sk[SABER_INDCPA_SECRETKEYBYTES]) {
     size_t i, j;
 
